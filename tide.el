@@ -335,14 +335,15 @@ this variable to non-nil value for Javascript buffers using `setq-local' macro."
   "Returns the path to either the currently open file or the
 current buffer's parent. This is needed to support indirect
 buffers, as they don't set `buffer-file-name' correctly."
-  (buffer-file-name (or (and (bound-and-true-p edit-indirect--overlay)
-                             (overlay-buffer edit-indirect--overlay))
-                        (and (bound-and-true-p org-src--overlay)
-                             (overlay-buffer org-src--overlay))
-                        ;; Needed for org-mode 8.x compatibility
-                        (and (bound-and-true-p org-edit-src-overlay)
-                             (overlay-buffer org-edit-src-overlay))
-                        (buffer-base-buffer))))
+  (file-local-name
+   (buffer-file-name (or (and (bound-and-true-p edit-indirect--overlay)
+                              (overlay-buffer edit-indirect--overlay))
+                         (and (bound-and-true-p org-src--overlay)
+                              (overlay-buffer org-src--overlay))
+                         ;; Needed for org-mode 8.x compatibility
+                         (and (bound-and-true-p org-edit-src-overlay)
+                              (overlay-buffer org-edit-src-overlay))
+                         (buffer-base-buffer)))))
 
 ;;; Compatibility
 
@@ -757,7 +758,8 @@ in the npm global installation."
   "Locate the typescript server in PATH.
 Return a string representing the existing full path or nil."
   (let ((exe (expand-file-name tide--tsserver path)))
-    (when (file-exists-p exe) exe)))
+    (when (file-exists-p exe)
+      (file-local-name exe))))
 
 (defun tide-tsserver-locater-npmlocal-projectile-npmglobal ()
   "Locate tsserver through project-local or global system settings."
@@ -1311,11 +1313,26 @@ Noise can be anything like braces, reserved keywords, etc."
   (when tide-buffer-dirty
     (setq tide-buffer-dirty nil)
     (unless tide-buffer-tmp-file
-      (setq tide-buffer-tmp-file (make-temp-file "tide")))
+      (setq tide-buffer-tmp-file
+	    (if (file-remote-p (buffer-file-name))
+		(let ((vec (tramp-dissect-file-name (buffer-file-name))))
+		  (if (version< emacs-version "27")
+		      (tramp-make-tramp-file-name
+		       (tramp-file-name-method vec)
+		       (tramp-file-name-user vec)
+		       (tramp-file-name-domain vec)
+		       (tramp-file-name-host vec)
+		       (tramp-file-name-port vec)
+		       (tramp-make-tramp-temp-file vec)
+		       (tramp-file-name-hop vec))
+		    (tramp-make-tramp-file-name vec (tramp-make-tramp-temp-file vec))))
+	      (make-temp-file "tide"))))
     (save-restriction
       (widen)
       (write-region (point-min) (point-max) tide-buffer-tmp-file nil 'no-message))
-    (tide-send-command "reload" `(:file ,(tide-buffer-file-name) :tmpfile ,tide-buffer-tmp-file))))
+    (tide-send-command
+     "reload"
+     `(:file ,(tide-buffer-file-name) :tmpfile ,(file-local-name tide-buffer-tmp-file)))))
 
 ;;; Code-fixes
 
