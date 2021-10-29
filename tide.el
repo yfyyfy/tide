@@ -442,16 +442,27 @@ ones and overrule settings in the other lists."
   "Returns a buffer associated with a file. This will return the
 current buffer if it matches `file'. This way we can support
 temporary and indirect buffers."
-  (cond
-   ((equal file (tide-buffer-file-name)) (current-buffer))
-   ((file-exists-p file) (find-file-noselect file))
-   (new-file (let ((buffer (create-file-buffer file)))
-               (with-current-buffer buffer
-                 (set-visited-file-name file)
-                 (basic-save-buffer)
-                 (display-buffer buffer t))
-               buffer))
-   (t (error "Invalid file %S" file))))
+  (let ((vec (tramp-dissect-file-name (buffer-file-name))))
+    (let ((file (if (version< emacs-version "27")
+		    (tramp-make-tramp-file-name
+		     (tramp-file-name-method vec)
+		     (tramp-file-name-user vec)
+		     (tramp-file-name-domain vec)
+		     (tramp-file-name-host vec)
+		     (tramp-file-name-port vec)
+		     file
+		     (tramp-file-name-hop vec))
+		  (tramp-make-tramp-file-name vec file))))
+      (cond
+       ((equal file (tide-buffer-file-name)) (current-buffer))
+       ((file-exists-p file) (find-file-noselect file))
+       (new-file (let ((buffer (create-file-buffer file)))
+		   (with-current-buffer buffer
+                     (set-visited-file-name file)
+                     (basic-save-buffer)
+                     (display-buffer buffer t))
+		   buffer))
+       (t (error "Invalid file %S" file))))))
 
 (defun tide-response-success-p (response)
   (and response (equal (plist-get response :success) t)))
