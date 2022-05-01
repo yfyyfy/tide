@@ -335,15 +335,17 @@ this variable to non-nil value for Javascript buffers using `setq-local' macro."
   "Returns the path to either the currently open file or the
 current buffer's parent. This is needed to support indirect
 buffers, as they don't set `buffer-file-name' correctly."
-  (file-local-name
-   (buffer-file-name (or (and (bound-and-true-p edit-indirect--overlay)
-                              (overlay-buffer edit-indirect--overlay))
-                         (and (bound-and-true-p org-src--overlay)
-                              (overlay-buffer org-src--overlay))
-                         ;; Needed for org-mode 8.x compatibility
-                         (and (bound-and-true-p org-edit-src-overlay)
-                              (overlay-buffer org-edit-src-overlay))
-                         (buffer-base-buffer)))))
+  (let ((file-name
+	 (buffer-file-name (or (and (bound-and-true-p edit-indirect--overlay)
+				    (overlay-buffer edit-indirect--overlay))
+                               (and (bound-and-true-p org-src--overlay)
+				    (overlay-buffer org-src--overlay))
+                               ;; Needed for org-mode 8.x compatibility
+                               (and (bound-and-true-p org-edit-src-overlay)
+				    (overlay-buffer org-edit-src-overlay))
+                               (buffer-base-buffer)))))
+    (and file-name (file-local-name file-name))))
+
 
 ;;; Compatibility
 
@@ -2011,6 +2013,7 @@ number."
               (setq multiple t)))))
     (and (not multiple) definition usage)))
 
+;; NG
 (defun tide-references ()
   "List all references to the symbol at point."
   (interactive)
@@ -2443,6 +2446,7 @@ current buffer."
 (defun tide-make-clickable-filespan (filespan)
   (propertize
    (concat
+
     (file-name-nondirectory (plist-get filespan :file))
     ":"
     (number-to-string (tide-plist-get filespan :start :line)))
